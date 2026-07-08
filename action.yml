@@ -1,0 +1,31 @@
+name: "Translink GTFS Schedule to SQLite"
+
+description: "Converts translinks GTFS schedule to a database"
+
+inputs:
+  gtfs-url:
+    description: "URL of the GTFS zip"
+    required: true
+
+  output:
+    description: "Output SQLite database filename"
+    required: false
+    default: "gtfs-schedule.db"
+
+runs:
+  using: "composite"
+
+  steps:
+    - uses: actions/setup-python@v6
+      with:
+        python-version: "3.14"
+
+    - shell: bash
+      run: |
+        pip install -r ${{ github.action_path }}/requirements.txt
+
+    - shell: bash
+      run: |
+        python ${{ github.action_path }}/parser.py \
+          --url "${{ inputs.gtfs-url }}" \
+          --output "${{ inputs.output }}"
