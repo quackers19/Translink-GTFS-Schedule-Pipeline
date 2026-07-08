@@ -1,4 +1,3 @@
--- Enable foreign key enforcement
 PRAGMA foreign_keys = ON;
 
 
@@ -181,6 +180,15 @@ CREATE TABLE stop_times (
 -- ============================================================
 
 CREATE TABLE shapes (
+    shape_id TEXT PRIMARY KEY
+);
+
+
+-- ============================================================
+-- shape_points.txt
+-- ============================================================
+
+CREATE TABLE shape_points (
     shape_id TEXT NOT NULL,
     shape_pt_lat REAL NOT NULL,
     shape_pt_lon REAL NOT NULL,
@@ -190,7 +198,10 @@ CREATE TABLE shapes (
     PRIMARY KEY (
         shape_id,
         shape_pt_sequence
-    )
+    ),
+
+    FOREIGN KEY (shape_id)
+        REFERENCES shapes(shape_id)
 );
 
 
@@ -221,6 +232,11 @@ ON stop_times(trip_id);
 -- Shape lookup
 CREATE INDEX idx_shapes_id
 ON shapes(shape_id);
+
+
+-- Shape point lookup
+CREATE INDEX idx_shape_points_id
+ON shape_points(shape_id);
 
 
 -- Route lookup by agency

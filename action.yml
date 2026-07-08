@@ -4,13 +4,22 @@ description: "Converts translinks GTFS schedule to a database"
 
 inputs:
   gtfs-url:
-    description: "URL of the GTFS zip"
+    description: "URL of the GTFS zip or files"
     required: true
 
   output:
     description: "Output SQLite database filename"
     required: false
     default: "gtfs-schedule.db"
+  schema:
+    description: "Path or URL to schema.sql to use (optional)"
+    required: false
+    default: ""
+
+  no-overwrite:
+    description: "If true, do not overwrite existing output database"
+    required: false
+    default: "false"
 
 runs:
   using: "composite"
@@ -26,6 +35,14 @@ runs:
 
     - shell: bash
       run: |
-        python ${{ github.action_path }}/parser.py \
-          --url "${{ inputs.gtfs-url }}" \
-          --output "${{ inputs.output }}"
+        # Build command with optional args
+        CMD=(python "${{ github.action_path }}/parser.py")
+        CMD+=(--input-url "${{ inputs.gtfs-url }}")
+        CMD+=(--output "${{ inputs.output }}")
+        if [ -n "${{ inputs.schema }}" ]; then
+          CMD+=(--schema "${{ inputs.schema }}")
+        fi
+        if [ "${{ inputs.no-overwrite }}" = "true" ]; then
+          CMD+=(--no-overwrite)
+        fi
+        "${CMD[@]}"
