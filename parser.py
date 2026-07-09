@@ -329,7 +329,16 @@ def parse_args():
     )
     return parser.parse_args()
 
+def trim_database(output_path):
+    """remove all database records for routes that do not pass through the selected stops"""
+    
+    conn = sqlite3.connect(output_path)
 
+    try:
+        pass
+
+    finally:
+        conn.close()
 def main():
     args = parse_args()
 
