@@ -3,6 +3,7 @@ import csv
 import os
 import sqlite3
 import sys
+import re
 import tempfile
 import zipfile
 from contextlib import contextmanager
@@ -174,6 +175,17 @@ def resolve_input_path(input_ref):
             os.remove(tmp_path)
 
 
+def normalize_csv_row(row, header):
+    if not row or all(cell.strip() == "" for cell in row):
+        return None
+
+    if len(row) < len(header):
+        return row + [""] * (len(header) - len(row))
+    if len(row) > len(header):
+        return row[: len(header)]
+    return row
+
+
 def load_file_into_table(conn, gtfs_dir, filename, table_name):
     file_path = os.path.join(gtfs_dir, filename)
     if not os.path.isfile(file_path):
@@ -198,13 +210,9 @@ def load_file_into_table(conn, gtfs_dir, filename, table_name):
             distinct_shape_ids = set()
             point_rows_to_insert = []
             for row in reader:
-                if not row or all(cell.strip() == "" for cell in row):
+                row = normalize_csv_row(row, header)
+                if row is None:
                     continue
-
-                if len(row) < len(header):
-                    row = row + [""] * (len(header) - len(row))
-                elif len(row) > len(header):
-                    row = row[: len(header)]
 
                 distinct_shape_ids.add(row[header.index("shape_id")].strip())
                 coerced = [
@@ -247,13 +255,9 @@ def load_file_into_table(conn, gtfs_dir, filename, table_name):
 
         rows_to_insert = []
         for row in reader:
-            if not row or all(cell.strip() == "" for cell in row):
+            row = normalize_csv_row(row, header)
+            if row is None:
                 continue
-            
-            if len(row) < len(header):
-                row = row + [""] * (len(header) - len(row))
-            elif len(row) > len(header):
-                row = row[: len(header)]
 
             coerced = [
                 coerce_value(value, type_map.get(col))
@@ -327,16 +331,123 @@ def parse_args():
         help=f"Path to the schema.sql file defining the database structure. "
              f"Defaults to schema.sql next to this script ({DEFAULT_SCHEMA_PATH}).",
     )
+    parser.add_argument(
+        "--stop-ids", default="",
+        help="Optional comma-separated list of stop IDs to keep when trimming the database.",
+    )
     return parser.parse_args()
 
-def trim_database(output_path):
-    """remove all database records for routes that do not pass through the selected stops"""
-    
+def parse_stop_ids(stop_ids_value):
+    if not stop_ids_value:
+        return []
+
+    stop_ids = []
+    seen = set()
+    for stop_id in re.split(r"[,\n]+", stop_ids_value):
+        normalized_stop_id = stop_id.strip()
+        if normalized_stop_id and normalized_stop_id not in seen:
+            seen.add(normalized_stop_id)
+            stop_ids.append(normalized_stop_id)
+    return stop_ids
+
+
+def trim_database(output_path, stop_ids):
+    """Remove records that are not reachable from the selected stop IDs."""
+    if not stop_ids:
+        print("Skipping trim: no stop IDs were provided.")
+        return
+
+    def execute_delete_sql(conn, sql, params=()):
+        deleted = conn.execute(sql, params).rowcount
+        return deleted if deleted != -1 else 0
+
+    def execute_delete(conn, table_name, column_name, keep_values):
+        if not keep_values:
+            return execute_delete_sql(conn, f"DELETE FROM {table_name}")
+
+        placeholders = ", ".join("?" for _ in keep_values)
+        sql = f"DELETE FROM {table_name} WHERE {column_name} NOT IN ({placeholders})"
+        return execute_delete_sql(conn, sql, keep_values)
+
     conn = sqlite3.connect(output_path)
 
     try:
-        pass
+        conn.execute("PRAGMA foreign_keys = OFF")
 
+        selected_stop_ids = list(stop_ids)
+        stop_placeholders = ", ".join("?" for _ in selected_stop_ids)
+        relevant_trip_ids = [
+            row[0]
+            for row in conn.execute(
+                f"SELECT DISTINCT trip_id FROM stop_times WHERE stop_id IN ({stop_placeholders})",
+                selected_stop_ids,
+            )
+        ]
+
+        relevant_route_ids = set()
+        relevant_service_ids = set()
+        relevant_shape_ids = set()
+        relevant_agency_ids = set()
+        relevant_stop_ids = set()
+
+        if relevant_trip_ids:
+            trip_placeholders = ", ".join("?" for _ in relevant_trip_ids)
+            for route_id, service_id, shape_id in conn.execute(
+                f"SELECT route_id, service_id, shape_id FROM trips WHERE trip_id IN ({trip_placeholders})",
+                relevant_trip_ids,
+            ):
+                if route_id:
+                    relevant_route_ids.add(route_id)
+                if service_id:
+                    relevant_service_ids.add(service_id)
+                if shape_id:
+                    relevant_shape_ids.add(shape_id)
+
+            for (stop_id,) in conn.execute(
+                f"SELECT DISTINCT stop_id FROM stop_times WHERE trip_id IN ({trip_placeholders})",
+                relevant_trip_ids,
+            ):
+                if stop_id:
+                    relevant_stop_ids.add(stop_id)
+
+        if relevant_route_ids:
+            route_placeholders = ", ".join("?" for _ in relevant_route_ids)
+            for (agency_id,) in conn.execute(
+                f"SELECT DISTINCT agency_id FROM routes WHERE route_id IN ({route_placeholders})",
+                list(relevant_route_ids),
+            ):
+                if agency_id:
+                    relevant_agency_ids.add(agency_id)
+
+        if relevant_trip_ids and relevant_stop_ids:
+            trip_placeholders = ", ".join("?" for _ in relevant_trip_ids)
+            stop_placeholders = ", ".join("?" for _ in relevant_stop_ids)
+            deleted_stop_times = execute_delete_sql(
+                conn,
+                f"DELETE FROM stop_times WHERE trip_id NOT IN ({trip_placeholders}) OR stop_id NOT IN ({stop_placeholders})",
+                relevant_trip_ids + list(relevant_stop_ids),
+            )
+        else:
+            deleted_stop_times = execute_delete_sql(conn, "DELETE FROM stop_times")
+        deleted_trips = execute_delete(conn, "trips", "trip_id", relevant_trip_ids)
+        deleted_routes = execute_delete(conn, "routes", "route_id", list(relevant_route_ids))
+        deleted_calendar_dates = execute_delete(conn, "calendar_dates", "service_id", list(relevant_service_ids))
+        deleted_calendar = execute_delete(conn, "calendar", "service_id", list(relevant_service_ids))
+        deleted_shape_points = execute_delete(conn, "shape_points", "shape_id", list(relevant_shape_ids))
+        deleted_shapes = execute_delete(conn, "shapes", "shape_id", list(relevant_shape_ids))
+        deleted_stops = execute_delete(conn, "stops", "stop_id", list(relevant_stop_ids))
+        deleted_agency = execute_delete(conn, "agency", "agency_id", list(relevant_agency_ids))
+
+        conn.commit()
+        conn.execute("VACUUM")
+
+        print("Trimmed database using stop IDs:", ", ".join(selected_stop_ids))
+        print(
+            "Removed rows -> "
+            f"stop_times: {deleted_stop_times}, trips: {deleted_trips}, routes: {deleted_routes}, "
+            f"calendar_dates: {deleted_calendar_dates}, calendar: {deleted_calendar}, "
+            f"shape_points: {deleted_shape_points}, shapes: {deleted_shapes}, stops: {deleted_stops}, agency: {deleted_agency}"
+        )
     finally:
         conn.close()
 def main():
@@ -348,7 +459,10 @@ def main():
 
     try:
         build_database(args.input_url, args.output, schema_path=args.schema, overwrite=not args.no_overwrite)
-    except Exception as exc:
+        stop_ids = parse_stop_ids(args.stop_ids)
+        if stop_ids:
+            trim_database(args.output, stop_ids)
+    except (FileNotFoundError, ValueError, sqlite3.Error, OSError, zipfile.BadZipFile) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
 

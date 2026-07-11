@@ -16,6 +16,11 @@ inputs:
     required: false
     default: ""
 
+  stop-ids:
+    description: "Optional comma-separated list of stop IDs to keep when trimming the database"
+    required: false
+    default: ""
+
   no-overwrite:
     description: "If true, do not overwrite existing output database"
     required: false
@@ -41,6 +46,9 @@ runs:
         CMD+=(--output "${{ inputs.output }}")
         if [ -n "${{ inputs.schema }}" ]; then
           CMD+=(--schema "${{ inputs.schema }}")
+        fi
+        if [ -n "${{ inputs['stop-ids'] }}" ]; then
+          CMD+=(--stop-ids "${{ inputs['stop-ids'] }}")
         fi
         if [ "${{ inputs.no-overwrite }}" = "true" ]; then
           CMD+=(--no-overwrite)
