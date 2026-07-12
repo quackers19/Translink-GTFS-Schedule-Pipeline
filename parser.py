@@ -312,7 +312,7 @@ def parse_args():
         description="Convert a GTFS Schedule feed (zip or unzipped directory) into a SQLite database."
     )
     parser.add_argument(
-        "--input-url", "-i", required=True,
+        "--gtfs_url", "-i", required=True,
         help="Path/URL to the GTFS zip file, or a directory containing unzipped GTFS .txt files.",
     )
     parser.add_argument(
@@ -453,12 +453,12 @@ def trim_database(output_path, stop_ids):
 def main():
     args = parse_args()
 
-    if not is_http_url(args.input_url) and not os.path.exists(args.input_url):
-        print(f"Error: input path does not exist: {args.input_url}", file=sys.stderr)
+    if not is_http_url(args.gtfs_url) and not os.path.exists(args.gtfs_url):
+        print(f"Error: input path does not exist: {args.gtfs_url}", file=sys.stderr)
         sys.exit(1)
 
     try:
-        build_database(args.input_url, args.output, schema_path=args.schema, overwrite=not args.no_overwrite)
+        build_database(args.gtfs_url, args.output, schema_path=args.schema, overwrite=not args.no_overwrite)
         stop_ids = parse_stop_ids(args.stop_ids)
         if stop_ids:
             trim_database(args.output, stop_ids)
