@@ -46,7 +46,7 @@ runs:
       run: |
         # Build command with optional args
         CMD=(python "${{ github.action_path }}/parser.py")
-        CMD+=(--input-url "${{ inputs.gtfs-url }}")
+        CMD+=(--gtfs-url "${{ inputs.gtfs-url }}")
         CMD+=(--output "${{ inputs.output }}")
         if [ -n "${{ inputs.schema }}" ]; then
           CMD+=(--schema "${{ inputs.schema }}")
