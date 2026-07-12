@@ -86,7 +86,7 @@ jobs:
       - uses: actions/checkout@v7
       
       - name: Build GTFS Database
-        uses: Translink-GTFS-Schedule-Pipeline@v1
+        uses: quackers19/Translink-GTFS-Schedule-Pipeline@v1.0.0
         with:
           gtfs-url: 'https://example.com/translink-gtfs.zip'
           output: 'gtfs.db'
@@ -113,7 +113,7 @@ jobs:
       - uses: actions/checkout@v7
       
       - name: Build GTFS (Region Only)
-        uses: Translink-GTFS-Schedule-Pipeline@v1
+        uses: quackers19/Translink-GTFS-Schedule-Pipeline@v1.0.0
 
         with:
           gtfs-url: 'https://example.com/translink-gtfs.zip'
