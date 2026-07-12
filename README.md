@@ -44,7 +44,7 @@ any stop id can be found on translinks website for a specific stop note this is 
 
 ```bash
 python parser.py \
-  --input-url gtfs.zip \
+  --url gtfs.zip \
   --output gtfs.sqlite \
   --stop-ids "STOP001,152,000007"
 ```
@@ -53,7 +53,7 @@ You can also pass stop IDs as newline-separated values:
 
 ```bash
 python parser.py \
-  --input-url gtfs.zip \
+  --url gtfs.zip \
   --output gtfs.sqlite \
   --stop-ids $'STOP001\nSTOP002\nSTOP003'
 ```
@@ -62,7 +62,7 @@ python parser.py \
 
 ```bash
 python parser.py \
-  --input-url gtfs.zip \
+  --url gtfs.zip \
   --output gtfs.sqlite \
   --no-overwrite
 ```
@@ -88,7 +88,7 @@ jobs:
       - name: Build GTFS Database
         uses: quackers19/Translink-GTFS-Schedule-Pipeline@v1.0.0
         with:
-          gtfs-url: 'https://example.com/translink-gtfs.zip'
+          url: 'https://example.com/translink-gtfs.zip'
           output: 'gtfs.db'
       
       - name: Upload Database
@@ -116,7 +116,7 @@ jobs:
         uses: quackers19/Translink-GTFS-Schedule-Pipeline@v1.0.0
 
         with:
-          gtfs-url: 'https://example.com/translink-gtfs.zip'
+          url: 'https://example.com/translink-gtfs.zip'
           output: 'gtfs.db'
           stop-ids: 'BT001,BT002,BT003,BT004,BT005'
       

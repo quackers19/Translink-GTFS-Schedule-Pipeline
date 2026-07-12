@@ -7,7 +7,7 @@ branding:
   color: 'white'
 
 inputs:
-  gtfs-url:
+  url:
     description: "URL of the GTFS zip or files"
     required: true
 
@@ -46,7 +46,7 @@ runs:
       run: |
         # Build command with optional args
         CMD=(python "${{ github.action_path }}/parser.py")
-        CMD+=(--gtfs-url "${{ inputs.gtfs-url }}")
+        CMD+=(--url "${{ inputs.url }}")
         CMD+=(--output "${{ inputs.output }}")
         if [ -n "${{ inputs.schema }}" ]; then
           CMD+=(--schema "${{ inputs.schema }}")
