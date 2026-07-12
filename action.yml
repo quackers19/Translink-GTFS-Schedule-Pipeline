@@ -2,6 +2,10 @@ name: "Translink GTFS Schedule to SQLite"
 
 description: "Converts translinks GTFS schedule to a database"
 
+branding:
+  icon: 'map-pin'
+  color: 'white'
+
 inputs:
   gtfs-url:
     description: "URL of the GTFS zip or files"
